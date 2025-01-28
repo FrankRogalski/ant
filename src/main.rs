@@ -1,27 +1,13 @@
 use std::sync::LazyLock;
 
 use anyhow::{anyhow, Error, Result};
+use bitvec::bitbox;
+use bitvec::boxed::BitBox;
 use clap::Parser;
 use rand::Rng;
 use raylib::ffi::TraceLogLevel;
 use raylib::prelude::Image;
 use raylib::{color::Color, prelude::RaylibDraw};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Cell {
-    Black,
-    White,
-}
-
-impl Cell {
-    fn invert(&mut self) {
-        *self = if *self == Cell::Black {
-            Cell::White
-        } else {
-            Cell::Black
-        }
-    }
-}
 
 #[derive(Debug)]
 enum Direction {
@@ -93,8 +79,8 @@ impl Ant {
         };
     }
 
-    fn turn(&mut self, cell: Cell) {
-        if cell == Cell::Black {
+    fn turn(&mut self, cell: bool) {
+        if !cell {
             self.dir.next();
         } else {
             self.dir.prev();
@@ -168,7 +154,7 @@ fn draw_rect(pos: usize, color: Color, image: &mut Image) {
 }
 
 fn main() -> Result<(), Error> {
-    let mut grid: Box<[Cell]> = vec![Cell::Black; GLOBALS.area].into_boxed_slice();
+    let mut grid: BitBox = bitbox![0; GLOBALS.area];
     let (mut rl, thread) = raylib::init()
         .title("Langton's ant")
         .size(GLOBALS.screen_width, GLOBALS.screen_height)
@@ -188,7 +174,7 @@ fn main() -> Result<(), Error> {
 
     while !rl.window_should_close() {
         for ant in ants.iter_mut() {
-            let color = if grid[ant.pos] == Cell::White {
+            let color = if grid[ant.pos] {
                 Color::WHITE
             } else {
                 Color::BLACK
@@ -196,7 +182,8 @@ fn main() -> Result<(), Error> {
             draw_rect(ant.pos, color, &mut image);
             ant.step();
             ant.turn(grid[ant.pos]);
-            grid[ant.pos].invert();
+            let next = !grid[ant.pos];
+            grid.set(ant.pos, next);
             draw_rect(ant.pos, Color::RED, &mut image);
         }
         let texture = rl
