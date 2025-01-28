@@ -1,25 +1,19 @@
-use std::{
-    array::from_fn,
-    thread::sleep,
-    time::{Duration, SystemTime},
-};
+use std::array::from_fn;
 
-use anyhow::Error;
+use anyhow::{anyhow, Error, Result};
 use rand::Rng;
-use raylib::{
-    color::Color,
-    prelude::{RaylibDraw, RaylibDrawHandle},
-};
+use raylib::ffi::TraceLogLevel;
+use raylib::prelude::Image;
+use raylib::{color::Color, prelude::RaylibDraw};
 
 const SCREEN_WIDTH: i32 = 1280;
 const SCREEN_HEIGHT: i32 = 720;
-const CELL_SIZE: usize = 10;
+const CELL_SIZE: usize = 1;
 const WIDTH: usize = SCREEN_WIDTH as usize / CELL_SIZE;
 const HEIGHT: usize = SCREEN_HEIGHT as usize / CELL_SIZE;
 const AREA: usize = WIDTH * HEIGHT;
-const ANTS: usize = 1;
-const FPS: f64 = 6.0;
-const FRAME_TIME: Duration = Duration::from_nanos((1e9 / FPS) as u64);
+const ANTS: usize = 100;
+const FPS: u32 = 120;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Cell {
@@ -37,6 +31,7 @@ impl Cell {
     }
 }
 
+#[derive(Debug)]
 enum Direction {
     Up = 0,
     Right = 1,
@@ -74,19 +69,37 @@ impl Direction {
     }
 }
 
+#[derive(Debug)]
 struct Ant {
-    pos: isize,
+    pos: usize,
     dir: Direction,
 }
 
 impl Ant {
-    fn step(&mut self, cell: Cell) {
+    fn step(&mut self) {
+        let pos = self.pos as isize;
         self.pos = match self.dir {
-            Direction::Up => (self.pos - WIDTH as isize).rem_euclid(AREA as isize),
-            Direction::Right => (self.pos + 1).rem_euclid(WIDTH as isize),
-            Direction::Down => (self.pos + WIDTH as isize).rem_euclid(AREA as isize),
-            Direction::Left => (self.pos - 1).rem_euclid(WIDTH as isize),
+            Direction::Up => (pos - WIDTH as isize).rem_euclid(AREA as isize) as usize,
+            Direction::Right => {
+                if (self.pos + 1) % WIDTH == 0 {
+                    self.pos + 1 - WIDTH
+                } else {
+                    self.pos + 1
+                }
+            }
+            Direction::Down => (self.pos + WIDTH).rem_euclid(AREA),
+            Direction::Left => {
+                let pos = pos - 1;
+                (if pos.rem_euclid(WIDTH as isize) == (WIDTH - 1) as isize {
+                    pos + WIDTH as isize
+                } else {
+                    pos
+                }) as usize
+            }
         };
+    }
+
+    fn turn(&mut self, cell: Cell) {
         if cell == Cell::Black {
             self.dir.next();
         } else {
@@ -95,15 +108,10 @@ impl Ant {
     }
 }
 
-fn draw_cell(pos: isize, cell: Cell, draw: &mut RaylibDrawHandle) {
-    let color = if cell == Cell::White {
-        Color::WHITE
-    } else {
-        Color::BLACK
-    };
-    let x = (pos % WIDTH as isize) as usize;
-    let y = (pos / WIDTH as isize) as usize;
-    draw.draw_rectangle(
+fn draw_rect(pos: usize, color: Color, image: &mut Image) {
+    let x = pos % WIDTH;
+    let y = pos / WIDTH;
+    image.draw_rectangle(
         (x * CELL_SIZE) as i32,
         (y * CELL_SIZE) as i32,
         CELL_SIZE as i32,
@@ -113,29 +121,40 @@ fn draw_cell(pos: isize, cell: Cell, draw: &mut RaylibDrawHandle) {
 }
 
 fn main() -> Result<(), Error> {
+    assert!(SCREEN_WIDTH % CELL_SIZE as i32 == 0);
+    assert!(SCREEN_HEIGHT % CELL_SIZE as i32 == 0);
     let mut rng = rand::thread_rng();
     let mut grid: [Cell; AREA] = [Cell::Black; AREA];
     let (mut rl, thread) = raylib::init()
-        .title("Ant simulation thing. i forgot the name :(")
+        .title("Langton's ant")
         .size(SCREEN_WIDTH, SCREEN_HEIGHT)
+        .log_level(TraceLogLevel::LOG_WARNING)
         .build();
     let mut ants: [Ant; ANTS] = from_fn(|_| Ant {
-        pos: rng.gen_range(0..AREA) as isize,
+        pos: rng.gen_range(0..AREA),
         dir: Direction::random(),
     });
+    let mut image = Image::gen_image_color(SCREEN_WIDTH, SCREEN_HEIGHT, Color::BLACK);
+    rl.set_target_fps(FPS);
 
     while !rl.window_should_close() {
-        let start = SystemTime::now();
-        let mut draw = rl.begin_drawing(&thread);
         for ant in ants.iter_mut() {
-            draw_cell(ant.pos, grid[ant.pos as usize], &mut draw);
-            ant.step(grid[ant.pos as usize]);
-            grid[ant.pos as usize].invert();
+            let color = if grid[ant.pos] == Cell::White {
+                Color::WHITE
+            } else {
+                Color::BLACK
+            };
+            draw_rect(ant.pos, color, &mut image);
+            ant.step();
+            ant.turn(grid[ant.pos]);
+            grid[ant.pos].invert();
+            draw_rect(ant.pos, Color::RED, &mut image);
         }
-        let frame_time = start.elapsed()?;
-        if frame_time < FRAME_TIME {
-            sleep(FRAME_TIME - frame_time);
-        }
+        let texture = rl
+            .load_texture_from_image(&thread, &image)
+            .map_err(|err| anyhow!(err))?;
+        let mut draw = rl.begin_drawing(&thread);
+        draw.draw_texture(&texture, 0, 0, Color::WHITE);
     }
     Ok(())
 }
