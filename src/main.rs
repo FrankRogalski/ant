@@ -5,7 +5,7 @@ use bitvec::bitbox;
 use bitvec::boxed::BitBox;
 use clap::Parser;
 use rand::Rng;
-use raylib::ffi::TraceLogLevel;
+use raylib::ffi::{KeyboardKey, TraceLogLevel};
 use raylib::prelude::Image;
 use raylib::{color::Color, prelude::RaylibDraw};
 
@@ -153,26 +153,36 @@ fn draw_rect(pos: usize, color: Color, image: &mut Image) {
     );
 }
 
+fn get_ants() -> Box<[Ant]> {
+    let mut rng = rand::thread_rng();
+    (0..GLOBALS.ants)
+        .map(|_| Ant {
+            pos: rng.gen_range(0..GLOBALS.area),
+            dir: Direction::random(),
+        })
+        .collect()
+}
+
 fn main() -> Result<(), Error> {
     let mut grid: BitBox = bitbox![0; GLOBALS.area];
+    let mut ants: Box<[Ant]> = get_ants();
     let (mut rl, thread) = raylib::init()
         .title("Langton's ant")
         .size(GLOBALS.screen_width, GLOBALS.screen_height)
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
-    let mut rng = rand::thread_rng();
-    let mut ants: Box<[Ant]> = (0..GLOBALS.ants)
-        .map(|_| Ant {
-            pos: rng.gen_range(0..GLOBALS.area),
-            dir: Direction::random(),
-        })
-        .collect();
     let mut image =
         Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
     rl.set_target_fps(GLOBALS.fps);
 
     while !rl.window_should_close() {
+        if rl.is_key_down(KeyboardKey::KEY_R) {
+            grid = bitbox![0; GLOBALS.area];
+            ants = get_ants();
+            image =
+                Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
+        }
         for ant in ants.iter_mut() {
             let color = if grid[ant.pos] {
                 Color::WHITE
