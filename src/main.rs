@@ -18,8 +18,8 @@ enum Direction {
     Left,
 }
 
-impl From<u8> for Direction {
-    fn from(value: u8) -> Self {
+impl From<i8> for Direction {
+    fn from(value: i8) -> Self {
         match value {
             0 => Direction::Up,
             1 => Direction::Right,
@@ -32,15 +32,15 @@ impl From<u8> for Direction {
 
 impl Direction {
     fn random() -> Self {
-        (rand::random::<u8>() % 4).into()
+        rand::random::<i8>().rem_euclid(4).into()
     }
 
     fn next(self) -> Self {
-        ((self as u8 + 1) % 4).into()
+        ((self as i8 + 1) % 4).into()
     }
 
     fn prev(self) -> Self {
-        ((self as u8 - 1) % 4).into()
+        (self as i8 - 1).rem_euclid(4).into()
     }
 }
 
@@ -170,6 +170,7 @@ fn main() -> Result<(), Error> {
     let mut image =
         Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
     rl.set_target_fps(GLOBALS.fps);
+    let mut fps = GLOBALS.fps;
 
     while !rl.window_should_close() {
         if rl.is_key_down(KeyboardKey::KEY_R) {
@@ -177,6 +178,22 @@ fn main() -> Result<(), Error> {
             ants = get_ants();
             image =
                 Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
+        }
+        if rl.is_key_down(KeyboardKey::KEY_W) && rl.is_key_pressed(KeyboardKey::KEY_LEFT_SUPER) {
+            break;
+        }
+        if rl.is_key_down(KeyboardKey::KEY_UP) {
+            fps += 5;
+            rl.set_target_fps(fps);
+        }
+        if rl.is_key_down(KeyboardKey::KEY_DOWN) {
+            if fps - 5 > 0 {
+                fps -= 5;
+                rl.set_target_fps(fps);
+            } else if fps > 1 {
+                fps = 1;
+                rl.set_target_fps(fps);
+            }
         }
         for ant in ants.iter_mut() {
             let color = if grid[ant.pos] {
