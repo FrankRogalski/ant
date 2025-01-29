@@ -1,6 +1,7 @@
+use core::panic;
 use std::sync::LazyLock;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Error};
 use bitvec::bitbox;
 use bitvec::boxed::BitBox;
 use clap::Parser;
@@ -9,41 +10,37 @@ use raylib::ffi::{KeyboardKey, TraceLogLevel};
 use raylib::prelude::Image;
 use raylib::{color::Color, prelude::RaylibDraw};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Direction {
     Up = 0,
-    Right = 1,
-    Down = 2,
-    Left = 3,
+    Right,
+    Down,
+    Left,
 }
 
-impl Direction {
-    fn random() -> Self {
-        match rand::random::<u8>() % 4 {
+impl From<u8> for Direction {
+    fn from(value: u8) -> Self {
+        match value {
             0 => Direction::Up,
             1 => Direction::Right,
             2 => Direction::Down,
             3 => Direction::Left,
-            _ => unreachable!(),
+            _ => panic!("Not a valid number!"),
         }
     }
+}
 
-    fn next(&mut self) {
-        *self = match *self {
-            Direction::Up => Direction::Right,
-            Direction::Right => Direction::Down,
-            Direction::Down => Direction::Left,
-            Direction::Left => Direction::Up,
-        }
+impl Direction {
+    fn random() -> Self {
+        (rand::random::<u8>() % 4).into()
     }
 
-    fn prev(&mut self) {
-        *self = match *self {
-            Direction::Up => Direction::Left,
-            Direction::Left => Direction::Down,
-            Direction::Down => Direction::Right,
-            Direction::Right => Direction::Up,
-        }
+    fn next(self) -> Self {
+        ((self as u8 + 1) % 4).into()
+    }
+
+    fn prev(self) -> Self {
+        ((self as u8 - 1) % 4).into()
     }
 }
 
@@ -81,9 +78,9 @@ impl Ant {
 
     fn turn(&mut self, cell: bool) {
         if !cell {
-            self.dir.next();
+            self.dir = self.dir.next();
         } else {
-            self.dir.prev();
+            self.dir = self.dir.prev();
         }
     }
 }
@@ -115,7 +112,6 @@ struct Globals {
     cell_size: i32,
     area: usize,
     width: usize,
-    // height: usize,
 }
 
 static GLOBALS: LazyLock<Globals> = LazyLock::new(|| {
@@ -136,7 +132,6 @@ static GLOBALS: LazyLock<Globals> = LazyLock::new(|| {
         screen_height: args.screen_height as i32,
         cell_size: args.cell_size as i32,
         width,
-        // height,
         area: width * height,
     }
 });
