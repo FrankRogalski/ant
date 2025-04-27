@@ -176,7 +176,6 @@ fn main() -> Result<(), Error> {
     let mut image =
         Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
     rl.set_target_fps(GLOBALS.fps);
-    let mut fps = GLOBALS.fps;
 
     while !rl.window_should_close() {
         if rl.is_key_down(KeyboardKey::KEY_R) {
@@ -184,22 +183,6 @@ fn main() -> Result<(), Error> {
             ants = get_ants();
             image =
                 Image::gen_image_color(GLOBALS.screen_width, GLOBALS.screen_height, Color::BLACK);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_W) && rl.is_key_pressed(KeyboardKey::KEY_LEFT_SUPER) {
-            break;
-        }
-        if rl.is_key_down(KeyboardKey::KEY_UP) {
-            fps += 5;
-            rl.set_target_fps(fps);
-        }
-        if rl.is_key_down(KeyboardKey::KEY_DOWN) {
-            if fps - 5 > 0 {
-                fps -= 5;
-                rl.set_target_fps(fps);
-            } else if fps > 1 {
-                fps = 1;
-                rl.set_target_fps(fps);
-            }
         }
         for _ in 0..GLOBALS.steps {
             for ant in ants.iter_mut() {
