@@ -94,6 +94,9 @@ struct Arguments {
     #[arg(short, long, default_value_t = 60)]
     fps: u32,
 
+    #[arg(short, long, default_value_t = 1)]
+    steps: u32,
+
     #[arg(long, default_value_t = 1280)]
     screen_width: u32,
 
@@ -107,6 +110,7 @@ struct Arguments {
 struct Globals {
     ants: usize,
     fps: u32,
+    steps: u32,
     screen_width: i32,
     screen_height: i32,
     cell_size: i32,
@@ -121,6 +125,7 @@ static GLOBALS: LazyLock<Globals> = LazyLock::new(|| {
     assert!(args.cell_size > 0);
     assert!(args.ants > 0);
     assert!(args.fps > 0);
+    assert!(args.steps > 0);
     assert!(args.screen_width % args.cell_size == 0);
     assert!(args.screen_height % args.cell_size == 0);
     let width = (args.screen_width / args.cell_size) as usize;
@@ -128,6 +133,7 @@ static GLOBALS: LazyLock<Globals> = LazyLock::new(|| {
     Globals {
         ants: args.ants,
         fps: args.fps,
+        steps: args.steps,
         screen_width: args.screen_width as i32,
         screen_height: args.screen_height as i32,
         cell_size: args.cell_size as i32,
@@ -195,18 +201,20 @@ fn main() -> Result<(), Error> {
                 rl.set_target_fps(fps);
             }
         }
-        for ant in ants.iter_mut() {
-            let color = if grid[ant.pos] {
-                Color::WHITE
-            } else {
-                Color::BLACK
-            };
-            draw_rect(ant.pos, color, &mut image);
-            ant.step();
-            ant.turn(grid[ant.pos]);
-            let next = !grid[ant.pos];
-            grid.set(ant.pos, next);
-            draw_rect(ant.pos, Color::RED, &mut image);
+        for _ in 0..GLOBALS.steps {
+            for ant in ants.iter_mut() {
+                let color = if grid[ant.pos] {
+                    Color::WHITE
+                } else {
+                    Color::BLACK
+                };
+                draw_rect(ant.pos, color, &mut image);
+                ant.step();
+                ant.turn(grid[ant.pos]);
+                let next = !grid[ant.pos];
+                grid.set(ant.pos, next);
+                draw_rect(ant.pos, Color::RED, &mut image);
+            }
         }
         let texture = rl
             .load_texture_from_image(&thread, &image)
